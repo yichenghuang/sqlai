@@ -1,0 +1,30 @@
+# Dependency directories
+node_modules/
+
+# Next.js build output
+.next/
+out/
+
+# Local environment variables
+.env.local
+.env.*.local
+.env
+
+# Other generated files
+.swc/
+.DS_Store # macOS specific
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# IDE/Editor specific files
+.vscode/
+.idea/
+*.sublime-project
+*.sublime-workspace
+
+# Next.js specific caches
+.next/cache/
+
+# Optional: if you use a specific static assets folder outside of `public`
+# static_assets/
