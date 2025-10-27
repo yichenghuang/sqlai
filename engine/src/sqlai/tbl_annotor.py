@@ -79,19 +79,6 @@ Table Schema JSON:
 
 """
 
-def write_jsonl(filename, text):
-    try:
-        if isinstance(text, str):
-            data = json.loads(text) # convert string to json object
-        else:
-            data = text  # Use as-is if already a Python object
-        with open(filename, 'a') as file:
-            json.dump(data, file, ensure_ascii=False)
-            file.write('\n')  # Append newline for JSONL format
-        print(f"Successfully appended text to {filename}")
-    except Exception as e:
-        print(f"Error appending to file: {e}")
-
 
 def pad_to_width(text, width):
     """Pad text to the specified display width."""
@@ -209,7 +196,7 @@ def annotate_table(data, schema = None, tbl_comment = None):
     if (schema):
         col_json = json.loads(col_annot)
         for (_, type), (_, annot) in zip(schema, col_json.items()):
-            annot["type"] = type
+            annot['type'] = type
         col_annot = json.dumps(col_json)
         tbl_annot = annotate_table_schema_by_columns(col_annot, tbl_comment)
     else:

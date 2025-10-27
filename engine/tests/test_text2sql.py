@@ -24,4 +24,5 @@ if __name__ == '__main__':
     mysql_source = MySQLDataSource(mysql_params)  # Env vars resolved here
     mysql_source.connect()
     # manager.register_source('mysql_db', mysql_source)
-    sql = mysql_source.execute(sql)
+    sql_res = mysql_source.execute(sql)
+    print(sql_res)

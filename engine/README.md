@@ -2,15 +2,19 @@ SQLAI engine
 
 Requirements:
 
+    sudo apt-get install pkg-config
+    sudo apt-get install python3-dev default-libmysqlclient-dev
+
     uv python install 3.12
-    uv pip install openai
-    uv pip install google-generativeai
-    uv pip install wcwidth
-    uv pip install sentence-transformers
-    uv pip install pymilvus
-    # sudo apt-get install python3-dev libmysqlclient-dev
-    uv pip install mysqlclient
     uv add fastmcp
+    uv add openai
+    uv add google-generativeai
+    uv add wcwidth
+    uv add sentence-transformers
+    uv add pymilvus
+    uv add mysqlclient
+    uv add readerwriterlock
+
 
 Installing the sqlai package in development mode to run tests:
     uv pip install --editable .
@@ -32,3 +36,17 @@ To Run MCP server:
             uv run fastmcp dev mcp_server.py
 
 
+Docker Image:
+
+    To optimize the Docker image build process, precompiled wheels are generated
+    using the following script:
+    
+        build_wheels.sh
+    
+    To build docker image:
+
+        docker build -t sqlai_mcp_server:latest .
+
+    To run the Docker container:
+
+        docker run -d --name mcp -p 8000:8000 sqlai_mcp_server

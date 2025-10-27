@@ -2,9 +2,10 @@ import os
 import sys
 import json
 import logging
-import MySQLdb
-from sqlai import tbl_annotor
+from sqlai.core.datasource.mysql import MySQLDataSource
+from sqlai.scan_datasource import scan_table
 from sqlai.utils import json_formatter
+from sqlai.tbl_milvus import TableMilvus
 
 
 mysql_host = "127.0.0.1"
@@ -31,6 +32,28 @@ def write_jsonl(filename, text):
         print(f"Successfully appended text to {filename}")
     except Exception as e:
         print(f"Error appending to file: {e}")
+
+
+def read_jsonl(filename):
+    objects = []
+    try:
+        with open(filename, 'r') as file:
+            for line in file:
+                line = line.strip()
+                if line:  # Skip empty lines
+                    try:
+                        obj = json.loads(line)
+                        objects.append(obj)
+                    except json.JSONDecodeError as e:
+                        print(f"Error decoding JSON line: {e}")
+        return objects
+    except FileNotFoundError:
+        print(f"Error: File {filename} not found")
+        return []
+    except Exception as e:
+        print(f"Error reading file: {e}")
+        return []
+    
 
 def annotate_db_table(conn, db):
     with conn.cursor() as cursor:
@@ -88,27 +111,42 @@ def annotate_db_table(conn, db):
     return 0
 
 
-def test_mysql():
-    conn = MySQLdb.connect(
-        host = mysql_host,
-        user = username,
-        passwd = password,
-    )
+def test_scan_mysql(mysql: MySQLDataSource, cursor):
+    dbs = mysql.get_databases(cursor)
+    for db in dbs:
+        tbls = mysql.get_tables(cursor, db)
 
-    cursor = conn.cursor()
+        for tbl in tbls:
+            table_annot_json = scan_table(mysql, cursor, db, tbl)
+            print(table_annot_json)
+            print('----------------')
+            write_jsonl(f'mysql_annot.jsonl', table_annot_json)
 
-    try:
-        cursor.execute("SHOW DATABASES")
-        databases = cursor.fetchall() # Fetches all rows
-        for db in databases:
-            logger.info(f"Processing database: {db[0]}")
-            annotate_db_table(conn, db[0])
 
-    except MySQLdb.Error as e:
-        logger.info(f"Error: {e}")
-        return 0
+
+def test_ins_milvus(mysql: MySQLDataSource, cursor):
+    sys_id = mysql.sys_id(cursor)
+    tbl_annot = read_jsonl('mysql_annot.jsonl')
+    print(sys_id)
+    print(tbl_annot)
+
+    tbl_vdb = TableMilvus()
+    res = tbl_vdb.delete_tables(sys_id)
+    print(res)
+
+    for annot in tbl_annot:
+        res = tbl_vdb.insert_tables(annot['table_annotation'], 
+                                    annot['metadata']['table'], 
+                                    sys_id, 
+                                    annot['metadata'])
 
 
 if __name__ == '__main__':
     logger.info("Test annotation on mysql database")
-    test_mysql()
+    conn_params = {'host': mysql_host, 'user': username, 'password': password}
+    mysql = MySQLDataSource(conn_params)
+    mysql.connect()
+    cursor = mysql.get_cursor()
+    # test_scan_mysql(mysql, cursor)
+    test_ins_milvus(mysql, cursor)
+    mysql.close_cursor(cursor)

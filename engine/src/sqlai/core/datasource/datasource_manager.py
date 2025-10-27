@@ -1,16 +1,18 @@
 import time
 import random
 import logging
+from typing import List, Dict, Any
 from threading import Lock
 from sqlai.core.datasource.datasource import DataSource
 from sqlai.core.datasource.mysql import MySQLDataSource
+from sqlai.tbl_milvus import TableMilvus
 
 
 logger = logging.getLogger(__name__)
 logger.addHandler(logging.NullHandler())
+tbl_vs = TableMilvus()
 
-
-def get_datasource(src_type: str, conn_params: dict) -> DataSource:
+def get_datasource_type(src_type: str, conn_params: dict) -> DataSource:
     match src_type:
         case 'mysql':  return MySQLDataSource(conn_params)
     
@@ -36,7 +38,7 @@ class DataSourceManager:
             if id not in cls._sources and id != 0:
                 return id
 
-    def register(cls, src_type: str, conn_params: dict):
+    def register(cls, src_type: str, conn_params: dict) -> dict:
         """
         Register a data source with a unique identifier.
         
@@ -45,19 +47,26 @@ class DataSourceManager:
             conn_params (dict): parameters used to connect to the data source.
         
         Returns:
-            int: data source identifier. 0: Connection failed.
+            dict: A dictionary containing scan information with the following keys:
+                - data_src_id (str): The unique identifier for the data source.
+                - scan_time (str): The timestamp of the latest scan
+                - error (str): The error message if connection fails, otherwise empty string.
         """
         with cls._lock:
-            data_src = get_datasource(src_type, conn_params)
+            data_src = get_datasource_type(src_type, conn_params)
             if not data_src:
                 return 0
             data_src.connect()
+            sys_id = data_src.sys_id()
             data_src_id = cls.get_unique_id()
             cls._sources[data_src_id] = data_src
+            # load vector database collection via datasource system id
+            tbl_vs.load_collection(sys_id)
             logger.info(f"Register data source '{src_type}' id: {data_src_id}")
-            return data_src_id
+            return {'data_src_id' : str(data_src_id), 
+                    'scan_time': time.strftime('%Y-%m-%d %H:%M:%S')}
 
-    def get_source(cls, data_src_id: int) -> DataSource:
+    def get_datasource(cls, data_src_id: str) -> DataSource:
         """
         Retrieve the DataSource object by its identifier for direct use.
 
@@ -67,11 +76,13 @@ class DataSourceManager:
         Returns: 
             DataSource: the DataSource instance.
         """
-        if data_src_id not in cls._sources:
-            raise ValueError(f"Source ID '{data_src_id}' not found.")
-        return cls._sources[data_src_id]
+        with cls._lock:
+            data_src = cls._sources.get(int(data_src_id))
+            if not data_src:
+                raise ValueError(f"Source ID '{data_src_id}' not found.")
+            return data_src
     
-    def execute(cls, data_src_id: int, qry: str):
+    def execute(cls, data_src_id: str, qry: str) -> List[Dict[str, Any]]:
         """
         Execute a query on the specified data source using its id.
         
@@ -83,7 +94,7 @@ class DataSourceManager:
             The result from the data source's execute method.
         """
         logger.info(f"data source: {data_src_id}")
-        data_src = cls.get_source(data_src_id)  # Reuse get_source for DRY
+        data_src = cls.get_datasource(data_src_id)  # Reuse get_source for DRY
         return data_src.execute(qry)
     
 

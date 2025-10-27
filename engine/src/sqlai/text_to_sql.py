@@ -84,12 +84,12 @@ A SQL query.
 """
 
 
-def text_to_sql(user_qry):
+def text_to_sql(sys_id, user_qry):
     ana_qry = analyze_query(user_qry)
     qry_json = parse_json(ana_qry)
     search_text = qry_json["search_text"]
 
-    matched_tbls = tbl_vdb.search_tables(search_text)
+    matched_tbls = tbl_vdb.search_tables(sys_id, search_text)
 
     # Filter dictionaries with score > 0.8
     filtered_tbls = [item for item in matched_tbls if item["score"] > 0.8]
