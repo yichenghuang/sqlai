@@ -1,29 +1,46 @@
 import { type NextRequest, NextResponse } from "next/server";
-import { Client } from "@modelcontextprotocol/sdk/client/index.js";
-import { StreamableHTTPClientTransport } from "@modelcontextprotocol/sdk/client/streamableHttp.js";
+import { callMCPServerWithRetry } from "@/app/utils/mcpUtils";
+
+interface QueryParams {
+  data_src_id: string;
+  qry: string;
+}
+
+interface QueryResponse {
+  sql: string;
+  data: Record<string, any>[];
+}
+
+interface ResultWithStructuredContent {
+  structuredContent: QueryResponse;
+  // ... ignore the rest of the complex properties
+}
+
 
 // Enhanced MCP server integration with retry logic and better error handling
-export async function POST(request: NextRequest) {
+export async function POST(request: Request) {
   try {
-    const { query } = await request.json()
-    console.log("Received query:", query)
- 
-    if (!query) {
+    const body = await request.json()
+
+    if (!body) {
       return NextResponse.json({ error: "Query is required" }, { status: 400 })
     }
+    const { dataSrcId: data_src_id, query: qry } = body;
 
-    // Enhanced MCP server communication with retry logic
-    const mcpResult = await callMCPServerWithRetry(query)
-    if (mcpResult.isError == true) {
-      throw new Error(mcpResult.content.text);
-    }
-    console.log(mcpResult.structuredContent)
-    if ('structuredContent' in mcpResult) {
+    // Call MCP connect_datasource tool with retry logic
+    const result = await callMCPServerWithRetry<QueryParams>(
+      "query", {data_src_id, qry});
+
+    console.log("result", result);
+
+    const typedResult = (result as unknown) as ResultWithStructuredContent;
+
+    if (result && 'structuredContent' in result) {
         return NextResponse.json({
-          message: mcpResult.message || generateResponseMessage(mcpResult.data, query),
-          data: [mcpResult.structuredContent],
-          query: query,
-          source: mcpResult.source || "mcp_server",
+          // message: result.message || generateResponseMessage(result.structuredContent, qry),
+          data: typedResult.structuredContent.data,
+          sql: typedResult.structuredContent.sql,
+          query: qry,
         })
     } else {
 
@@ -35,50 +52,50 @@ export async function POST(request: NextRequest) {
 }
 
 // Enhanced MCP server communication with retry logic
-async function callMCPServerWithRetry(query: string, maxRetries = 3) {
-  // const mcpServerUrl = process.env.MCP_SERVER_URL
-  // const mcpApiKey = process.env.MCP_API_KEY
+// async function callMCPServerWithRetry(query: string, maxRetries = 3) {
+//   // const mcpServerUrl = process.env.MCP_SERVER_URL
+//   // const mcpApiKey = process.env.MCP_API_KEY
 
-  // if (!mcpServerUrl) {
-  //   throw new Error("MCP_SERVER_URL not configured")
-  // }
+//   // if (!mcpServerUrl) {
+//   //   throw new Error("MCP_SERVER_URL not configured")
+//   // }
 
-  for (let attempt = 1; attempt <= maxRetries; attempt++) {
-    try {
-      // Step 1: Submit query to MCP server
-      const client = new Client({
-        name: 'streamable-http-client',
-        version: '1.0.0'
-      });
+//   for (let attempt = 1; attempt <= maxRetries; attempt++) {
+//     try {
+//       // Step 1: Submit query to MCP server
+//       const client = new Client({
+//         name: 'streamable-http-client',
+//         version: '1.0.0'
+//       });
       
-      const transport = new StreamableHTTPClientTransport(
-        new URL("http://localhost:8000/mcp")
-      );
-      await client.connect(transport);
+//       const transport = new StreamableHTTPClientTransport(
+//         new URL("http://localhost:8000/mcp")
+//       );
+//       await client.connect(transport);
      
-      const toolsResponse = await client.listTools();
-      const qryTool = toolsResponse.tools?.find((t) => t.name === "query");
-      if (!qryTool) {
-        throw new Error("Tool 'test' not found on MCP server");
-      }
+//       const toolsResponse = await client.listTools();
+//       const qryTool = toolsResponse.tools?.find((t) => t.name === "query");
+//       if (!qryTool) {
+//         throw new Error("Tool 'test' not found on MCP server");
+//       }
  
-      const result = await client.callTool({
-        name: "query",
-        arguments: { tbl: query }
-      });
-      return result
-    } catch (error) {
-      console.warn(`MCP server attempt ${attempt} failed:`, error)
+//       const result = await client.callTool({
+//         name: "query",
+//         arguments: { tbl: query }
+//       });
+//       return result
+//     } catch (error) {
+//       console.warn(`MCP server attempt ${attempt} failed:`, error)
 
-      if (attempt === maxRetries) {
-        throw error
-      }
+//       if (attempt === maxRetries) {
+//         throw error
+//       }
 
-      // Exponential backoff
-      await new Promise((resolve) => setTimeout(resolve, Math.pow(2, attempt) * 1000))
-    }
-  }
-}
+//       // Exponential backoff
+//       await new Promise((resolve) => setTimeout(resolve, Math.pow(2, attempt) * 1000))
+//     }
+//   }
+// }
 
 // Poll MCP server for async query results
 async function pollForResults(baseUrl: string, queryId: string, apiKey?: string, maxPolls = 10) {

@@ -1,0 +1,32 @@
+version: '3.8'
+
+services:
+  sqlai-app:
+    image: sqlai-app
+    container_name: sqlai
+    ports:
+      - "3000:3000"
+    restart: unless-stopped
+    depends_on:
+      - mcp
+    environment:
+      - MCP_SERVER_URL=http://mcp:8000/mcp
+      - NODE_ENV=production
+    networks:
+      - app-network
+
+  mcp:
+    image: sqlai_mcp_server
+    container_name: mcp
+    ports:
+      - "8000:8000"
+    restart: unless-stopped
+    environment:
+      - GOOGLE_API_KEY=${GOOGLE_API_KEY}
+      - NODE_ENV=production
+    networks:
+      - app-network
+
+networks:
+  app-network:
+    driver: bridge
