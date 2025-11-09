@@ -72,7 +72,7 @@ class DataSource(ABC):
         pass
 
     @abstractmethod
-    def execute(cls, query: str) -> List[Dict[str, Any]]:
+    def execute(cls, cursor, query: str) -> List[Dict[str, Any]]:
         """
         Execute a query (SQL or equivalent) and return the result table.
 

@@ -10,11 +10,12 @@ and important details for SQL generation.
 {USER_QUERY}
 
 ### Instructions:
-1. Identify the **main intent** of the query (e.g., aggregation, filtering, join, grouping, ordering).
-2. Extract **measures/metrics** the user wants (e.g., revenue, count of customers, average order value).
-3. Extract **dimensions/attributes** that the user wants the data grouped or filtered by (e.g., country, year, customer name).
-4. Extract **filters/conditions** and **time constraints** (e.g., "in 2023", "customers in Europe").
-5. Generate a **descriptive search text** from the user query that looks like a database table description. 
+1. Return in english.
+2. Identify the **main intent** of the query (e.g., aggregation, filtering, join, grouping, ordering).
+3. Extract **measures/metrics** the user wants (e.g., revenue, count of customers, average order value).
+4. Extract **dimensions/attributes** that the user wants the data grouped or filtered by (e.g., country, year, customer name).
+5. Extract **filters/conditions** and **time constraints** (e.g., "in 2023", "customers in Europe").
+6. Generate a **descriptive search text** from the user query that looks like database table description. 
    including:
    - *table purpose** (e.g., "orders", "customers", "sales").
    - Broad **column description** like 'location', 'date' to describe attributes relevant to the query 

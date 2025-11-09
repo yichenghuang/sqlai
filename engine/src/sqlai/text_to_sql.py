@@ -86,6 +86,7 @@ A SQL query.
 
 def text_to_sql(sys_id, user_qry):
     ana_qry = analyze_query(user_qry)
+    print("analyzed query: ", ana_qry)
     qry_json = parse_json(ana_qry)
     search_text = qry_json["search_text"]
 

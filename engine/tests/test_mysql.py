@@ -125,21 +125,21 @@ def test_scan_mysql(mysql: MySQLDataSource, cursor):
 
 
 def test_ins_milvus(mysql: MySQLDataSource, cursor):
-    sys_id = mysql.sys_id(cursor)
+    sys_id = mysql.sys_id()
     tbl_annot = read_jsonl('mysql_annot.jsonl')
     print(sys_id)
     print(tbl_annot)
 
     tbl_vdb = TableMilvus()
-    res = tbl_vdb.delete_tables(sys_id)
-    print(res)
+    tbl_vdb.drop_collection(sys_id)
+    tbl_vdb.load_collection(sys_id)
 
     for annot in tbl_annot:
-        res = tbl_vdb.insert_tables(annot['table_annotation'], 
-                                    annot['metadata']['table'], 
-                                    sys_id, 
+        res = tbl_vdb.insert_tables(sys_id, 
+                                    annot['table_annotation'], 
+                                    annot['metadata']['table'],
                                     annot['metadata'])
-
+        
 
 if __name__ == '__main__':
     logger.info("Test annotation on mysql database")

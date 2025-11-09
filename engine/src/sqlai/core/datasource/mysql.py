@@ -16,7 +16,7 @@ class MySQLDataSource(DataSource):
     Args:
         connection_params (dict): Dictionary containing connection parameters.
         - host[:port] (str, optional): The database host and port number.
-        - user (str, optional): The database username. Defaults to
+        - username (str, optional): The database username. Defaults to
                   `os.getenv('MYSQL_USER')` or empty string if unset.
         - password (str, optional): The database password. Defaults to
                   `os.getenv('MYSQL_PASSWORD')` or empty string if unset.
@@ -26,14 +26,15 @@ class MySQLDataSource(DataSource):
     def __init__(cls, conn_params: dict):
         super().__init__(conn_params)
 
+        logger.info(conn_params)
         if not cls._conn_params.get('host'):
             cls._conn_params['host'] = "127.0.0.1"
             cls._conn_params['port'] = 3306
         else:
             cls._conn_params['port'] = extract_port(cls._conn_params['host'], 
                                                     3306)
-        if not cls._conn_params.get('user'):
-            cls._conn_params['user'] = os.getenv('MYSQL_USER') or ""
+        if not cls._conn_params.get('username'):
+            cls._conn_params['username'] = os.getenv('MYSQL_USER') or ""
         if not cls._conn_params.get('password'):
             cls._conn_params['password'] = os.getenv('MYSQL_PASSWORD') or ""
         if not cls._conn_params.get('database'):
@@ -45,7 +46,7 @@ class MySQLDataSource(DataSource):
                 cls._conn = MySQLdb.connect(
                     host = cls._conn_params['host'],
                     port = cls._conn_params['port'],
-                    user = cls._conn_params['user'],
+                    user = cls._conn_params['username'],
                     passwd = cls._conn_params['password'],
                     database = cls._conn_params['database'],
                 )
@@ -75,10 +76,10 @@ class MySQLDataSource(DataSource):
 
     def get_databases(cls, cursor):
         """ Return databases """
-        
+        system_dbs = {'information_schema', 'mysql', 'performance_schema', 'sys'}
         cursor.execute("SHOW DATABASES")
         dbs = cursor.fetchall() # Fetches all rows 
-        return [row[0] for row in dbs]
+        return [row[0] for row in dbs if row[0] not in system_dbs]
     
     def get_tables(cls, cursor, db: str):
         """ Return tables in a database """
@@ -133,7 +134,7 @@ class MySQLDataSource(DataSource):
         
         return table, schema, comment
 
-    def execute(cls, query: str) -> List[Dict[str, Any]]:
+    def execute(cls, cursor, query: str) -> List[Dict[str, Any]]:
         """
         Execute a query (SQL or equivalent) and return the result table.
 
@@ -146,7 +147,7 @@ class MySQLDataSource(DataSource):
         """
         
         logger.info(f"executing query '{query}'")
-        cursor = cls._conn.cursor()
+        # cursor = cls._conn.cursor()
         cursor.execute(query)
         # Get column names from cursor.description
         columns = [desc[0] for desc in cursor.description]
@@ -158,6 +159,6 @@ class MySQLDataSource(DataSource):
             for row in cursor.fetchall()
         ]
 
-        cursor.close()
+        # cursor.close()
         return rows
 
