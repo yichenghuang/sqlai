@@ -47,7 +47,7 @@ Docker Image:
 
     To build docker image:
 
-        docker build -t sqlai-app .
+        docker build -t bigobject/sqlai-app .
 
     To run the Docker container:
 

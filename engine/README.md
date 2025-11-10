@@ -45,8 +45,8 @@ Docker Image:
     
     To build docker image:
 
-        docker build -t sqlai_mcp_server:latest .
+        docker build -t bigobject/sqlai-mcp-server:latest .
 
     To run the Docker container:
 
-        docker run -d --name mcp -p 8000:8000 sqlai_mcp_server
+        docker run -d --name mcp -p 8000:8000 bigobject/sqlai-mcp-server

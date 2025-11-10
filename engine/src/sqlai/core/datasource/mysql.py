@@ -84,7 +84,7 @@ class MySQLDataSource(DataSource):
     def get_tables(cls, cursor, db: str):
         """ Return tables in a database """
         
-        cursor.execute(f"USE {db}")
+        cursor.execute(f"USE `{db}`")
         cursor.execute("SHOW TABLES")
         tbls = cursor.fetchall() # Fetches all rows 
         return [row[0] for row in tbls]
@@ -100,7 +100,7 @@ class MySQLDataSource(DataSource):
                 - str: The comment or description associated with the table.
 
         """
-        cursor.execute(f"SELECT * FROM {tbl} LIMIT 5")
+        cursor.execute(f"SELECT * FROM `{tbl}` LIMIT 5")
         # Get column headers
         headers = [desc[0] for desc in cursor.description]
         # Get rows and combine with headers
