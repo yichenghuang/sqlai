@@ -194,9 +194,15 @@ def annotate_table(data, schema = None, tbl_comment = None):
     col_annot = annotate_columns(data)
 
     if (schema):
+        schema_lookup = {col_name: (col_type, col_comment)
+                         for col_name, col_type, col_comment in schema}
         col_json = json.loads(col_annot)
-        for (_, type), (_, annot) in zip(schema, col_json.items()):
-            annot['type'] = type
+        for col_name, annot in col_json.items():          # col_annot == col_json
+            if col_name in schema_lookup:                  # safety net
+                col_type, col_comment = schema_lookup[col_name]
+                annot['type']        = col_type
+                annot['col_comment'] = col_comment
+
         col_annot = json.dumps(col_json)
         tbl_annot = annotate_table_schema_by_columns(col_annot, tbl_comment)
     else:

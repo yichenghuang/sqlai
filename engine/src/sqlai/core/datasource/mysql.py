@@ -63,6 +63,9 @@ class MySQLDataSource(DataSource):
         if cls._conn:
             cls._conn.close()
 
+    def name(cls):
+        return 'MySQL'
+    
     def sys_id(cls):
         return cls._sys_id    
 
@@ -96,7 +99,7 @@ class MySQLDataSource(DataSource):
         Returns:
             tuple: A tuple containing:
                 - list[list]: A list of lists, where the first list contains column headers and each subsequent list represents a row of data.
-                - list[tuple]: A list of tuples, where each tuple contains (column_name, data_type) for the table schema.ct: A dictionary describing the table schema, with column names as keys and data types as values.
+                - list[tuple]: A list of tuples, where each tuple contains (column_name, data_type, comment) for a column in a database table.                - list[tuple]: A list of tuples, where each tuple contains (column_name, data_type) for the table schema.ct: A dictionary describing the table schema, with column names as keys and data types as values.
                 - str: The comment or description associated with the table.
 
         """
@@ -115,7 +118,7 @@ class MySQLDataSource(DataSource):
         ]
 
         # Get table schema
-        cursor.execute(f"""SELECT COLUMN_NAME, DATA_TYPE
+        cursor.execute(f"""SELECT COLUMN_NAME, DATA_TYPE, COLUMN_COMMENT
                        FROM INFORMATION_SCHEMA.COLUMNS
                        WHERE TABLE_SCHEMA = '{db}' 
                        AND TABLE_NAME = '{tbl}'""");
@@ -150,15 +153,15 @@ class MySQLDataSource(DataSource):
         # cursor = cls._conn.cursor()
         cursor.execute(query)
         # Get column names from cursor.description
-        columns = [desc[0] for desc in cursor.description]
-        rows = [
-            {
-                col: 'NULL' if val is None else str(val)
-                for col, val in zip(columns, row)
-            }
-            for row in cursor.fetchall()
-        ]
-
-        # cursor.close()
-        return rows
-
+        if cursor.description is not None:
+            columns = [desc[0] for desc in cursor.description]
+            rows = [
+                {
+                    col: 'NULL' if val is None else str(val)
+                    for col, val in zip(columns, row)
+                }
+                for row in cursor.fetchall()
+            ]
+            return rows
+        
+        return None

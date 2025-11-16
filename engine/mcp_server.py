@@ -51,10 +51,14 @@ def query(data_src_id:str, qry: str) -> dict:
         Example: [{"col1": value1, "col2": value2}, ...]
     """
     ds = ds_manager.get_datasource(data_src_id)
-    sql = text_to_sql(ds.sys_id(), qry)
-    logger.info(f'sql: {sql}')
-    res = ds.execute(sql)
-
+    sql_json = text_to_sql(ds.sys_id(), qry)
+    logger.info(f'sql: {sql_json}')
+    cursor = ds.get_cursor()
+    db = sql_json["used_tables"][0]["db"]
+    sql = sql_json["sql"]
+    ds.execute(cursor, f"USE `{db}`")       # ignore return
+    res = ds.execute(cursor, sql)
+    ds.close_cursor(cursor)
     return {'sql': sql, 'data': res}
 
 

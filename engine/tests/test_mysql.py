@@ -143,10 +143,10 @@ def test_ins_milvus(mysql: MySQLDataSource, cursor):
 
 if __name__ == '__main__':
     logger.info("Test annotation on mysql database")
-    conn_params = {'host': mysql_host, 'user': username, 'password': password}
+    conn_params = {'host': mysql_host, 'username': username, 'password': password}
     mysql = MySQLDataSource(conn_params)
     mysql.connect()
     cursor = mysql.get_cursor()
-    # test_scan_mysql(mysql, cursor)
-    test_ins_milvus(mysql, cursor)
+    test_scan_mysql(mysql, cursor)
+    # test_ins_milvus(mysql, cursor)
     mysql.close_cursor(cursor)

@@ -32,6 +32,11 @@ class DataSource(ABC):
         """Close the connection to the data source."""
         pass
 
+    @abstractmethod
+    def name(cls):
+        """Data Source name"""
+        pass
+
     @abstractmethod      
     def sys_id(cls, cursor):
         """ Return data source system/unique id."""
@@ -65,7 +70,7 @@ class DataSource(ABC):
         Returns:
             tuple: A tuple containing:
                 - list[tuple]: A list of tuples, where the first list contains column headers and each subsequent list represents a row of data.
-                - list[tuple]: A list of tuples, where each tuple contains (column_name, data_type) for the table schema.
+                - list[tuple]: A list of tuples, where each tuple contains (column_name, data_type, comment) for a column in a database table.
                 - str: The comment or description associated with the table.
 
         """
