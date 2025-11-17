@@ -1,7 +1,9 @@
+import datetime
 import os
 import sys
 import json
 import logging
+from sqlai.scan_datasource import scan_datasource
 from sqlai.core.datasource.mysql import MySQLDataSource
 from sqlai.scan_datasource import scan_table
 from sqlai.utils import json_formatter
@@ -112,10 +114,15 @@ def annotate_db_table(conn, db):
 
 
 def test_scan_mysql(mysql: MySQLDataSource, cursor):
+    scan_datasource(mysql, datetime.datetime.now())
+
+
+def test_scan_mysql_to_json(mysql: MySQLDataSource, cursor):
     dbs = mysql.get_databases(cursor)
     for db in dbs:
         tbls = mysql.get_tables(cursor, db)
 
+        tbls = tbls[:1]
         for tbl in tbls:
             table_annot_json = scan_table(mysql, cursor, db, tbl)
             print(table_annot_json)

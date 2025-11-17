@@ -8,6 +8,12 @@ def parse_json(json_str):
     return json_str
 
 
+def ensure_json_string(data) -> str:
+    if not isinstance(data, str):
+        return json.dumps(data)
+    return data
+
+
 def remove_code_block(text: str, marker: str) -> str:
     """
     Removes the ```marker and ``` in returned string

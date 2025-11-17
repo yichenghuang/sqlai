@@ -12,6 +12,56 @@ logger = logging.getLogger(__name__)
 logger.addHandler(logging.NullHandler())
 
 
+def _serialize_value(value) -> str:
+    """Recursively converts a value (string, list, or dict) into a flat string."""
+    if isinstance(value, list):
+        # Join list items with commas
+        return ", ".join([_serialize_value(item) for item in value])
+    elif isinstance(value, dict):
+        # Recursively process dict keys/values
+        parts = []
+        for k, v in value.items():
+            # Format as "key: value"
+            parts.append(f"{k}: {_serialize_value(v)}")
+        return "; ".join(parts)
+    else:
+        # Treat as a basic string
+        return str(value)
+
+
+def create_table_embedding_input(table_annot_json, col_annot_json):
+    """
+    Combines the table tag and column annotations into a custom string
+    by treating all keys as general content labels.
+    """
+    
+    # 1. Generate the TABLE: section (Holistic Context)
+    table_parts = []
+    for key, value in table_annot_json.items():
+        serialized_value = _serialize_value(value)
+        # Format as "Key: serialized_value"
+        table_parts.append(f"{key}: {serialized_value}")
+        
+    table_context = "TABLE: " + "; ".join(table_parts) + "."
+    
+    # 2. Generate the COLUMNS: section (Specific Details)
+    
+    column_strings = []
+    # Iterate through each column, treating the column name as the primary key
+    for col_name, col_data in col_annot_json.items():
+        # Serialize the column data (category, property, tags, etc.)
+        col_content = _serialize_value(col_data)
+        
+        # Format as "column_name (content)"
+        col_string = f"{col_name} ({col_content})"
+        column_strings.append(col_string)
+        
+    columns_context = "COLUMNS: " + "; ".join(column_strings) + "."
+    
+    # 3. Combine both sections
+    return f"{table_context} {columns_context}"
+
+
 def scan_table(data_src: DataSource, cursor, db: str, tbl: str):
     """Scans a table and returns its annotated metadata in JSON format.
 
@@ -26,14 +76,14 @@ def scan_table(data_src: DataSource, cursor, db: str, tbl: str):
     """
     tbl_data, schema, comment = data_src.inspect_table(cursor, db, tbl)
 
-    tbl_annot, col_annot = tbl_annotor.annotate_table(tbl_data, schema, comment)
-    table_annot_json = json.loads(tbl_annot)
+    tbl_annot_json, col_annot_json = tbl_annotor.annotate_table(tbl_data, schema, comment)
+    # table_annot_json = json.loads(tbl_annot)
  
-    tbl_meta = {"db": db, "table": tbl, "description": comment,
-                "schema": col_annot}
-    table_annot_json["metadata"] = tbl_meta
+    tbl_meta = {"db": db, "table": tbl, "comment": comment,
+                "schema": col_annot_json}
+    tbl_annot_json["metadata"] = tbl_meta
 
-    return table_annot_json
+    return tbl_annot_json
 
 
 def scan_datasource(data_src: DataSource, complete_time: datetime.datetime):
@@ -85,8 +135,11 @@ def scan_datasource(data_src: DataSource, complete_time: datetime.datetime):
         for tbl in tables:
             logger.info(tbl)
             tbl_scan = scan_table(data_src, cursor, db, tbl)
+            table_annotation = create_table_embedding_input(tbl_scan['table_annotation'],
+                tbl_scan['metadata']['schema'])
+            print(table_annotation)
             res = tbl_vdb.insert_tables(sys_id,
-                                        tbl_scan['table_annotation'], 
+                                        table_annotation, 
                                         tbl_scan['metadata']['table'],  
                                         tbl_scan['metadata'])
             processed_tables += 1
@@ -100,6 +153,7 @@ def scan_datasource(data_src: DataSource, complete_time: datetime.datetime):
         current_progress += db_share
 
     tracker.mark_complete(sys_id)
+    print(sys_id)
 
     return num_tbls
 

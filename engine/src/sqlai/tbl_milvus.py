@@ -7,6 +7,8 @@ from sqlai.core import SingletonMeta
 logger = logging.getLogger(__name__)
 logger.addHandler(logging.NullHandler())
 
+
+
 class TableMilvus(metaclass=SingletonMeta):
     def __init__(cls, uri: str = None, 
                  embedding_model: str = 'BAAI/bge-small-en-v1.5', dim: int = 384):

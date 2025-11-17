@@ -12,7 +12,7 @@ def getQueryTables(qry):
     return response
 
 
-matches = tbl_vdb.search_tables(query='Get sales for different months')
+matches = tbl_vdb.search_tables('_ef992a97be0311f0a4fa2eb586cb076e', query='Accounts table containing region and loan eligibility columns?')
 print(len(matches))
 for item in matches:
     metadata = item['metadata']

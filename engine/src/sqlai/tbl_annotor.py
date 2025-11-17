@@ -15,7 +15,7 @@ For each column, return:
    `schema:birthDate`, `schema:dateCreated`, etc.).
 2. Its corresponding `schema.org` type (e.g., `schema:Date`, `schema:Text`, 
    `schema:Number`, etc.).
-3. Its breif description.
+3. Its brief description.
 
 Return your answer as a JSON mapping of column names to objects with 
 `schemaOrgProperty `, `schemaOrgType`, and `description`.
@@ -77,6 +77,82 @@ Instructions:
 
 Table Schema JSON:
 
+"""
+
+
+table_col_annot_sys_prompt = """ 
+You are an expert in relational database schema annotation using the schema.org 
+vocabulary. Your task is to analyze a given database column, including its name 
+and sample values, and provide three distinct semantic classifications for that 
+column.
+
+For each column, return:
+
+1. **Category**: The primary high-level semantic entity or data type of the 
+   column. You **must select one** from the following constrained list:
+    * `Person`, `Organization`, `Location`, `Product`, `Event`, `Date/Time`, 
+    `Quantity/Measurement`, `Text/Description`, `Identifier/Code`, 
+    `Boolean/Status`.
+
+2.  **schemaOrgProperty**: The most semantically appropriate `schema.org` 
+    property name (e.g., `schema:orderDate`, `schema:birthDate`, 
+    `schema:streetAddress`).
+
+3.  **tags**: A list of 1–3 precise, fine-grained semantic terms derived from 
+    the column's name, comment, and sample values.
+    * Tags must be **short phrases** (not sentences).
+    * They should include synonyms and specific context to enhance human searchability.
+    * Avoid duplicates or overly general terms.
+
+Return your final output as a JSON object, mapping column names to an object 
+containing the keys `category`, `schemaOrgProperty`, and `tags`.
+"""
+
+table_col_annot_user_prompt = """
+### Input table
+
+#### Column Definitions
+{col_def}
+
+#### Sample Data:
+{sample_data}
+"""
+
+
+table_annot_sys_prompt = """
+You are an expert in data cataloging, specifically tasked with synthesizing 
+high-level metadata from detailed schema annotations.
+
+Your task is to analyze the provided column annotations and return a concise, 
+structured table-level tag in JSON format.
+
+Output JSON MUST contain ONLY the following four keys, with the values being 
+lists of strings (for main_entities, semantic_roles, and summary_keywords) 
+or a single string (for domain):
+1. 'main_entities': The 2-3 primary entities described in the table 
+   (e.g., 'Customer', 'Order', 'Product').
+2. 'domain': The specific industry or context of the data (e.g., 
+   'Retail Logistics', 'Financial Services', 'Clinical Trials').
+3. 'semantic_roles': The 4-5 most important schema.org properties present in 
+   the columns (e.g., 'schema:orderDate', 'schema:unitPrice').
+4. 'summary_keywords': 5-7 general keywords describing the table's overall 
+   purpose and content (e.g., 'historical data', 'account status', 
+   'location').
+
+Do not include any descriptive text, explanations, or extraneous information 
+outside of the required JSON object.
+"""
+
+table_annot_user_prompt = """
+### Input
+1. COLUMN ANNOTATIONS:
+{col_annot}
+
+2. SAMPLE DATA:
+{sample_data}
+
+3. TABLE COMMENT:
+{tbl_comment}
 """
 
 
@@ -156,56 +232,104 @@ def list_table_to_markdown(data):
     return table
 
 
-def annotate_columns(data):
-    if isinstance(data[0], dict):
-        prompt = ann_col_qry + dict_table_to_markdown(data)
-    else:
-        prompt = ann_col_qry + list_table_to_markdown(data)
+# def annotate_columns(data):
+#     if isinstance(data[0], dict):
+#         prompt = ann_col_qry + dict_table_to_markdown(data)
+#     else:
+#         prompt = ann_col_qry + list_table_to_markdown(data)
         
-    response = llm_chat(prompt)
-    return response
+#     response = llm_chat(prompt)
+#     return response
 
 
-def annotate_table_schema_by_columns(col_annot, tbl_comment = None):
-    """
-    Annotation a table by columns with database schema
-    """
-    qry = table_schema_annot_qry + col_annot
-    response = llm_chat(qry)
-    return response
+# def annotate_table_schema_by_columns(col_annot, tbl_comment = None):
+#     """
+#     Annotation a table by columns with database schema
+#     """
+#     qry = table_schema_annot_qry + col_annot
+#     response = llm_chat(qry)
+#     return response
 
 
-def annotate_table_by_columns(col_json):
-    """
-    Annotation a table by columns
-    """
-    qry = table_desc_qry + col_json
-    response = llm_chat(qry)
+# def annotate_table_by_columns(col_json):
+#     """
+#     Annotation a table by columns
+#     """
+#     qry = table_desc_qry + col_json
+#     response = llm_chat(qry)
+#     return response
+
+
+# def annotate_table(data, schema = None, tbl_comment = None):
+#     """
+#     Annotation a table by a sample table data,
+#     schema is ((col1, type), ...) if any,
+#     Return table annotation and columns schema.org
+#     """
+
+#     col_annot = annotate_columns(data)
+
+#     if (schema):
+#         schema_lookup = {col_name: (col_type, col_comment)
+#                          for col_name, col_type, col_comment in schema}
+#         col_json = json.loads(col_annot)
+#         for col_name, annot in col_json.items():          # col_annot == col_json
+#             if col_name in schema_lookup:                  # safety net
+#                 col_type, col_comment = schema_lookup[col_name]
+#                 annot['type']        = col_type
+#                 annot['col_comment'] = col_comment
+
+#         col_annot = json.dumps(col_json)
+#         tbl_annot = annotate_table_schema_by_columns(col_annot, tbl_comment)
+#     else:
+#         return annotate_table_by_columns(col_annot), col_annot
+
+#     return tbl_annot, col_annot
+
+
+def annotate_columns(tbl_data, schema):
+    prompt = table_col_annot_user_prompt.format(col_def = schema, sample_data = tbl_data)
+
+    response = llm_chat(prompt, table_col_annot_sys_prompt)
+    print(response)
     return response
 
 
 def annotate_table(data, schema = None, tbl_comment = None):
     """
     Annotation a table by a sample table data,
-    schema is ((col1, type), ...) if any,
+    schema is ((col1, type, comment), ...) if any,
     Return table annotation and columns schema.org
     """
-
-    col_annot = annotate_columns(data)
-
-    if (schema):
-        schema_lookup = {col_name: (col_type, col_comment)
-                         for col_name, col_type, col_comment in schema}
-        col_json = json.loads(col_annot)
-        for col_name, annot in col_json.items():          # col_annot == col_json
-            if col_name in schema_lookup:                  # safety net
-                col_type, col_comment = schema_lookup[col_name]
-                annot['type']        = col_type
-                annot['col_comment'] = col_comment
-
-        col_annot = json.dumps(col_json)
-        tbl_annot = annotate_table_schema_by_columns(col_annot, tbl_comment)
+    tbl_data = None
+    if isinstance(data[0], dict):
+        tbl_data = dict_table_to_markdown(data)
     else:
-        return annotate_table_by_columns(col_annot), col_annot
+        tbl_data = list_table_to_markdown(data)
 
-    return tbl_annot, col_annot
+
+    col_annot = annotate_columns(tbl_data, schema)
+
+    schema_lookup = {col_name: (col_type, col_comment)
+                  for col_name, col_type, col_comment in schema}
+    col_annot_json = json.loads(col_annot)
+    for col_name, annot in col_annot_json.items():          # col_annot == col_json
+        if col_name in schema_lookup:                  # safety net
+            col_type, col_comment = schema_lookup[col_name]
+            annot['type']        = col_type
+            annot['col_comment'] = col_comment
+
+    print(col_annot_json)
+
+    col_annot = json.dumps(col_annot_json)
+
+    prompt = table_annot_user_prompt.format(col_annot = col_annot, 
+        sample_data = tbl_data, tbl_comment = tbl_comment)
+    tbl_annot = llm_chat(prompt, table_annot_sys_prompt)
+
+    tbl_annot_json = json.loads(tbl_annot)
+    tbl_annot_json = {"table_annotation": tbl_annot_json}
+
+    print(tbl_annot_json)
+
+    return tbl_annot_json, col_annot_json

@@ -29,9 +29,9 @@ if __name__ == '__main__':
     # sql = text_to_sql(mysql_sys_id, "Show me the total revenue by Product categories")
     # sql = text_to_sql(mysql_sys_id, "不同性別的銷售總額")
     # sql = text_to_sql(mysql_sys_id, "男女生的銷售額各是多少")
-    # sql_json = text_to_sql(mysql_sys_id,"How many accounts who have region in Prague are eligible for loans?")
+    sql_json = text_to_sql(mysql_sys_id,"How many accounts who have region in Prague are eligible for loans?")
     # sql_json = text_to_sql(mysql_sys_id,"The average unemployment ratio of 1995 and 1996, which one has higher percentage?")
-    sql_json = text_to_sql(mysql_sys_id,"List out the no. of districts that have female average salary is more than 6000 but less than 10000?")
+    # sql_json = text_to_sql(mysql_sys_id,"List out the no. of districts that have female average salary is more than 6000 but less than 10000?")
     
     #sql = text_to_sql(mysql_sys_id, "What is the average GDP growth rate of each state in Malaysia in 2019?")
     # sql = text_to_sql(mysql_sys_id,"The average unemployment ratio of 1995 and 1996, which one has higher percentage?")
