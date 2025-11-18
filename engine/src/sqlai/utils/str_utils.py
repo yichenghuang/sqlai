@@ -50,6 +50,26 @@ def extract_port(host_string, default_port=80):
     except ValueError:
         # Return default if port is not a valid integer
         return default_port
-    
+
+
 def make_collectioname(s):
     return '_' + ''.join(c for c in s if c.isalnum() or c == '_')
+
+
+def serialize_value(value) -> str:
+    """Recursively converts a value (string, list, or dict) into a flat string."""
+    if isinstance(value, list):
+        # Join list items with commas
+        return ", ".join([serialize_value(item) for item in value])
+    elif isinstance(value, dict):
+        # Recursively process dict keys/values
+        parts = []
+        for k, v in value.items():
+            # Format as "key: value"
+            parts.append(f"{k}: {serialize_value(v)}")
+        return "; ".join(parts)
+    else:
+        # Treat as a basic string
+        return str(value)
+
+

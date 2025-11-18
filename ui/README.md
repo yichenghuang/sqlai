@@ -4,6 +4,7 @@ This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-
 
 Requirements:
 
+    nvm install 18
     pnpm install lucide-react
     pnpm add @tanstack/react-table
     pnpm install @modelcontextprotocol/sdk

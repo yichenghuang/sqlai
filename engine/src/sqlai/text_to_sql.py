@@ -2,7 +2,7 @@ import json
 import logging
 from sqlai.qry_analyzer import analyze_query
 from sqlai.tbl_milvus import TableMilvus
-from sqlai.utils.str_utils import parse_json, remove_code_block
+from sqlai.utils.str_utils import parse_json, serialize_value
 from sqlai.llm_service import llm_chat
 
 
@@ -158,11 +158,9 @@ Review and improve this query to better match the question and schema.
 """
 
 
-def find_matched_tables(sys_id, user_qry, threshold):
-    intent_json = analyze_query(user_qry)
-    print("analyzed query: ", intent_json)
-    qry_json = parse_json(intent_json)
-    search_text = qry_json["search_text"]
+def find_matched_tables(sys_id, search_text, threshold):
+    # qry_json = parse_json(intent_json)
+    # search_text = qry_json["search_text"]
 
     matched_tbls = tbl_vdb.search_tables(sys_id, search_text)
  
@@ -182,7 +180,7 @@ def find_matched_tables(sys_id, user_qry, threshold):
       [{"table": item["metadata"]["table"], "score": item["score"]} for item in filtered_tbls]})
 
     tables_json = [tbl["metadata"] for tbl in filtered_tbls]
-    return intent_json, tables_json
+    return tables_json
 
 
 def text_to_sql(sys_id, user_qry, max_retries=5):
@@ -197,7 +195,11 @@ def text_to_sql(sys_id, user_qry, max_retries=5):
             # Re-run table matching if necessary.
             if (attempt > 1):
                 threshold -= 0.05
-            intent_json, tables_json = find_matched_tables(sys_id, user_qry, threshold)
+            qry_intent = analyze_query(user_qry)
+            intent_json = json.loads(qry_intent)
+            print("analyzed query: ", intent_json)
+            search_text = serialize_value(intent_json["semantic"])
+            tables_json = find_matched_tables(sys_id, search_text, threshold)
             
             if tables_json is None:
                 continue

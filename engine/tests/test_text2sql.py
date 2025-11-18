@@ -18,7 +18,12 @@ logger.setLevel(logging.INFO)
 
 
 if __name__ == '__main__':
-    logger.info("Test text2sql")
+    if len(sys.argv) < 2:
+        print("Usage: python test_text2sql.py \"your query here\"")
+        sys.exit(1)
+    
+    query = " ".join(sys.argv[1:])  # supports multi-word queries
+
     conn_params = {'host': mysql_host, 'username': username, 'password': password}
 
     mysql_source = MySQLDataSource(conn_params)  # Env vars resolved here
@@ -26,19 +31,16 @@ if __name__ == '__main__':
     mysql_sys_id = mysql_source.sys_id()
     cursor = mysql_source.get_cursor()
 
-    # sql = text_to_sql(mysql_sys_id, "Show me the total revenue by Product categories")
-    # sql = text_to_sql(mysql_sys_id, "不同性別的銷售總額")
+    sql_json = text_to_sql(mysql_sys_id, query)
+    print(sql_json)
+
+    # sql_json = text_to_sql(mysql_sys_id, "Show me the total revenue by Product categories")
+    # sql_json = text_to_sql(mysql_sys_id, "不同性別的銷售總額")
     # sql = text_to_sql(mysql_sys_id, "男女生的銷售額各是多少")
-    sql_json = text_to_sql(mysql_sys_id,"How many accounts who have region in Prague are eligible for loans?")
+    #sql_json = text_to_sql(mysql_sys_id,"How many accounts who have region in Prague are eligible for loans?")
     # sql_json = text_to_sql(mysql_sys_id,"The average unemployment ratio of 1995 and 1996, which one has higher percentage?")
     # sql_json = text_to_sql(mysql_sys_id,"List out the no. of districts that have female average salary is more than 6000 but less than 10000?")
-    
-    #sql = text_to_sql(mysql_sys_id, "What is the average GDP growth rate of each state in Malaysia in 2019?")
-    # sql = text_to_sql(mysql_sys_id,"The average unemployment ratio of 1995 and 1996, which one has higher percentage?")
-    #sql = text_to_sql(mysql_sys_id,"Find the top 5 customers who spent the most in 2025.")
-
  
     # manager.register_source('mysql_db', mysql_source)
     # sql_res = mysql_source.execute(cursor, sql)
     # mysql_source.close_cursor(cursor)
-    print(sql_json)
