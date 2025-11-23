@@ -79,33 +79,31 @@ Table Schema JSON:
 
 """
 
+# 1. **Category**: The primary high-level semantic entity or data type of the 
+#    column. You **must select one** from the following constrained list:
+#     * `Person`, `Organization`, `Location`, `Product`, `Event`, `Date/Time`, 
+#     `Quantity/Measurement`, `Text/Description`, `Identifier/Code`, 
+#     `Boolean/Status`.
+# 2.  **schemaOrgProperty**: The most semantically appropriate `schema.org` 
+#     property name (e.g., `schema:orderDate`, `schema:birthDate`, 
+#     `schema:streetAddress`).
+# `category`, `schemaOrgProperty`,
+# 
+# For each column, return:
+# -  **tags**: A list of 1–3 precise, fine-grained semantic terms derived from 
+#     the column's name, comment, and sample values.
+#     * Tags must be **short phrases** (not sentences).
+#     * They should include synonyms and specific context to enhance human searchability.
+#     * Avoid duplicates or overly general terms. 
 
 table_col_annot_sys_prompt = """ 
-You are an expert in relational database schema annotation using the schema.org 
-vocabulary. Your task is to analyze a given database column, including its name 
-and sample values, and provide three distinct semantic classifications for that 
-column.
-
-For each column, return:
-
-1. **Category**: The primary high-level semantic entity or data type of the 
-   column. You **must select one** from the following constrained list:
-    * `Person`, `Organization`, `Location`, `Product`, `Event`, `Date/Time`, 
-    `Quantity/Measurement`, `Text/Description`, `Identifier/Code`, 
-    `Boolean/Status`.
-
-2.  **schemaOrgProperty**: The most semantically appropriate `schema.org` 
-    property name (e.g., `schema:orderDate`, `schema:birthDate`, 
-    `schema:streetAddress`).
-
-3.  **tags**: A list of 1–3 precise, fine-grained semantic terms derived from 
-    the column's name, comment, and sample values.
-    * Tags must be **short phrases** (not sentences).
-    * They should include synonyms and specific context to enhance human searchability.
-    * Avoid duplicates or overly general terms.
+You are an expert in relational database schema annotation. 
+Your task is to analyze each column in a table and return its
+brief description. 
+Please infer based on the column name, example values and column comment.
 
 Return your final output as a JSON object, mapping column names to an object 
-containing the keys `category`, `schemaOrgProperty`, and `tags`.
+containing the keys and `description`.
 """
 
 table_col_annot_user_prompt = """
@@ -119,7 +117,7 @@ table_col_annot_user_prompt = """
 """
 
 
-table_annot_sys_prompt = """
+table_annot_sys_prompt_v0 = """
 You are an expert in data cataloging, specifically tasked with synthesizing 
 high-level metadata from detailed schema annotations.
 
@@ -142,6 +140,27 @@ or a single string (for domain):
 Do not include any descriptive text, explanations, or extraneous information 
 outside of the required JSON object.
 """
+
+table_annot_sys_prompt = """ 
+You are given the structured schema of a table in JSON format. Each column has a name, its database data type, its mapped schema.org property, its mapped schema.org type, and a brief description.
+Your task:
+
+Write a concise, semantically rich table annotation (50–100 words) to enable semantic search for table matching that summarizes:
+
+- What kind of data the table contains.
+- The overall purpose or domain of the table (e.g., geographic, infrastructure, social data).
+- Key column roles, data types and its name.
+- Potential use cases.
+
+Instructions:
+
+* Return your answer as a JSON mapping of table_annotation.
+* Do not list all column names or types explicitly.
+* Summarize the structure and semantics naturally.
+* Do not mention “JSON” or the schema format.
+
+"""
+
 
 table_annot_user_prompt = """
 ### Input

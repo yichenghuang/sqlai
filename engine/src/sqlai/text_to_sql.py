@@ -1,5 +1,6 @@
 import json
 import logging
+from sqlai.core.datasource import datasource
 from sqlai.qry_analyzer import analyze_query
 from sqlai.tbl_milvus import TableMilvus
 from sqlai.utils.str_utils import parse_json, serialize_value
@@ -13,6 +14,33 @@ logger.addHandler(logging.NullHandler())
 tbl_vdb = TableMilvus()
 
 # - Generate SQL compatible with {database_name} database.
+
+  #  "db": "salesdb",
+  #   "table": "customers",
+  #   "schema": {
+  #     "id": {"schemaOrgProperty": "schema:identifier", "schemaOrgType": "schema:Integer", 
+  #            "description": "Unique identifier for the person.", "type": "int"},
+  #     "name": {"schemaOrgProperty": "schema:name", "schemaOrgType": "schema:Text", 
+  #              "description": "The name of the person.", "type": "varchar"}
+  #     "gender": {"schemaOrgProperty": "schema:gender", "schemaOrgType": "schema:Text",
+  #                "description": "The gender of the person.", "type": "varchar"}
+  #   }
+  # },
+  # {
+  #   "db": "salesdb",
+  #   "table": "orders",
+  #   "schema": {
+  #     "order_id": {"schemaOrgProperty": "schema:orderNumber", "schemaOrgType": "schema:Text", 
+  #                  "description": "The identifier of the order.", "type": "int"},
+  #     "customer_id": {"schemaOrgProperty": "schema:customer", "schemaOrgType": "schema:Integer", 
+  #                  "description": "The identifier of the customer who placed the order.", "type": "int"}
+  #     "Product_id": {"schemaOrgProperty": "schema:productID", "schemaOrgType": "schema:Integer", 
+  #                    "description": "The identifier of the product included in the order.", "type": "int"}
+  #     "date": {"schemaOrgProperty": "schema:orderDate", "schemaOrgType": "schema:DateTime", 
+  #              "description": "The date and time when the order was placed.", "type": "datetime"}
+  #     "amount": {"schemaOrgProperty": "schema:totalPrice", "schemaOrgType": "schema:Number", 
+  #                "description": "The total price of the order.", "type": "double"}}
+
 
 text2sql_sys_prompt = """
 You are an expert SQL query generator. 
@@ -31,9 +59,16 @@ Rules:
 - Prefer INNER JOINs over subqueries for linking tables.
 - Use subqueries only if they’re logically required (e.g., aggregation before filtering)
 - Prefer descriptive fields (e.g., `customer_name` over `customer_id`).
+- Prioritize each column’s 'col_comment' for semantic cues (e.g., year, data source, context).
+- When columns are similar, identify the explicit noun in the user's query that 
+  defines the filter. 
+  * Choose the column whose col_comment (or column name if no comment) contains 
+    the exact noun/phrase or its closest direct synonym.
+  * Never select a column just because it contains a related but broader/looser word.
+  * Only if no exact intent match exists, choose column based on the 
+    col_comment, description or name that best matches the user’s intent.
 - Ignore irrelevant tables and columns.
 - Always include the database name as a prefix when tables come from different databases.
-- Prioritize each column’s comment for semantic cues (e.g., year, data source, context).
 - When columns are similar, choose based on the comment/description that best matches the user’s intent.
 - If some information is ambiguous or missing, make the best reasonable assumption and lower your confidence accordingly.
 - Return the result strictly as a valid JSON object with the following fields:
@@ -54,8 +89,25 @@ Guidelines for "confidence":
 - <0.4: High ambiguity, schema mismatch, or risky operation.
 
 Example:
+
 User question:
 "Find the top 5 customers who spent the most in 2024."
+
+Analytical intent:
+{
+  "intent": "Ordering and Filtering",
+  "metrics": [
+    "Total amount spent by customer"
+  ],
+  "attributes": [
+    "Customer"
+  ],
+  "filters": [],
+  "time_constraints": [
+    "Year 2024"
+  ],
+  "search_text": "Customer orders with order date and amount spent."
+}
 
 Available tables:
 [
@@ -63,28 +115,20 @@ Available tables:
     "db": "salesdb",
     "table": "customers",
     "schema": {
-      "id": {"schemaOrgProperty": "schema:identifier", "schemaOrgType": "schema:Integer", 
-             "description": "Unique identifier for the person.", "type": "int"},
-      "name": {"schemaOrgProperty": "schema:name", "schemaOrgType": "schema:Text", 
-               "description": "The name of the person.", "type": "varchar"}
-      "gender": {"schemaOrgProperty": "schema:gender", "schemaOrgType": "schema:Text",
-                 "description": "The gender of the person.", "type": "varchar"}
+      "id": {"description": "Unique identifier for the person.", "type": "int", "col_comment"=""},
+      "name": {"description": "The name of the person.", "type": "varchar", "col_comment"=""}
+      "gender": {"description": "The gender of the person.", "type": "varchar", "col_comment"=""}
     }
   },
   {
     "db": "salesdb",
     "table": "orders",
     "schema": {
-      "order_id": {"schemaOrgProperty": "schema:orderNumber", "schemaOrgType": "schema:Text", 
-                   "description": "The identifier of the order.", "type": "int"},
-      "customer_id": {"schemaOrgProperty": "schema:customer", "schemaOrgType": "schema:Integer", 
-                   "description": "The identifier of the customer who placed the order.", "type": "int"}
-      "Product_id": {"schemaOrgProperty": "schema:productID", "schemaOrgType": "schema:Integer", 
-                     "description": "The identifier of the product included in the order.", "type": "int"}
-      "date": {"schemaOrgProperty": "schema:orderDate", "schemaOrgType": "schema:DateTime", 
-               "description": "The date and time when the order was placed.", "type": "datetime"}
-      "amount": {"schemaOrgProperty": "schema:totalPrice", "schemaOrgType": "schema:Number", 
-                 "description": "The total price of the order.", "type": "double"}}
+      "order_id": {"description": "The identifier of the order.", "type": "int", "col_comment=""},
+      "customer_id": {"description": "The identifier of the customer who placed the order.", "type": "int", "col_comment=""}
+      "Product_id": {"description": "The identifier of the product included in the order.", "type": "int", "col_comment=""}
+      "date": {"description": "The date and time when the order was placed.", "type": "datetime", "col_comment=""}
+      "amount": {"description": "The total price of the order.", "type": "double", "col_comment=""}}
 
     }
   }
@@ -107,7 +151,7 @@ text2sql_user_prompt = """
 User question:
 {user_query}
 
-Analytical Intent (MUST FOLLOW):
+Analytical intent:
 {intent_json}
 
 Available tables:
@@ -118,18 +162,33 @@ Available tables:
 text2sql_refine_sys_prompt = """
 You are an expert SQL query auditor and refiner.
 
-Your task:
-Given a natural language question, the database schema, and a previously generated SQL query with low confidence, you must:
-1. Analyze whether the SQL correctly answers the question using the provided schema.
-2. Identify issues (e.g., incorrect columns, missing filters, wrong joins).
-3. Revise the SQL to fix those issues and increase correctness.
-4. Recalculate a new confidence score (0–1).
+**REGENERATION INSTRUCTION:**
+  You are fixing a previously generated SQL query with low confidence given the 
+  natural language question, the database schema, and a previously generated SQL
+  query.
+1. **CRITICAL REVIEW:** Compare the previous SQL with the original user query. 
+   Determine which concepts/filters in the query were missed or handled incorrectly.
+2. **SEMANTIC SEARCH:** If the missing filter or required data is not available 
+   in the tables currently joined, perform a semantic search across the entire 
+   schema to locate the correct table and column (using the description and 
+   col_comment).
+3. **JOIN CORRECTION:** If a new table is required, you **must** add the correct 
+   `JOIN` clause.
+4. **OUTPUT:** Generate the complete, corrected SQL and recalcuate a new 
+   confidence socre(0-1). Correctness and completeness are paramount.
 
 Rules:
 - Use only provided tables and columns.
 - Keep query logic simple and accurate.
 - Avoid unnecessary subqueries if the same result can be expressed through joins.
-- Prefix tables with their database name if they come from different databases.
+- Prioritize each column’s 'col_comment' for semantic cues (e.g., year, data source, context).
+- When columns are similar, identify the explicit noun in the user's query that 
+  defines the filter. 
+  * Choose the column whose col_comment (or column name if no comment) contains 
+    the exact noun/phrase or its closest direct synonym.
+  * Never select a column just because it contains a related but broader/looser word.
+  * Only if no exact intent match exists, choose column based on the 
+    col_comment, description or name that best matches the user’s intent.
 - Output must be a **valid JSON** in this format:
 
 {
@@ -158,6 +217,25 @@ Review and improve this query to better match the question and schema.
 """
 
 
+# refine prompt
+text2sql_revise_sys_prompt = """
+You are an expert SQL analyst and debugger. 
+Your task is to analyze an incorrect SQL query generated by another LLM, 
+identify all errors (especially in the WHERE clause, JOIN conditions, 
+column selections, aggregations, and filtering logic), and produce a correct, 
+efficient SQL query that exactly answers the user's natural-language question.
+
+You will be given:
+1. The user's original question
+2. 3. The faulty SQL query
+3. The relevant table schemas (with column names, data types, descriptions, and 
+  col_comment)
+
+  
+
+
+"""
+
 def find_matched_tables(sys_id, search_text, threshold):
     # qry_json = parse_json(intent_json)
     # search_text = qry_json["search_text"]
@@ -167,7 +245,7 @@ def find_matched_tables(sys_id, search_text, threshold):
     # Filter dictionaries with score > 0.77, an empiric value!
     filtered_tbls = [item for item in matched_tbls if item["score"] > threshold]
 
-    logger.info("matched_tbls", extra={"filtered_tbls": filtered_tbls})
+    # logger.info("matched_tbls", extra={"filtered_tbls": filtered_tbls})
 
     if not filtered_tbls:
         sorted_tbls = sorted(matched_tbls, key=lambda x: x["score"], reverse=True)
@@ -183,12 +261,11 @@ def find_matched_tables(sys_id, search_text, threshold):
     return tables_json
 
 
-def text_to_sql(sys_id, user_qry, max_retries=5):
-    sql = ""
+def text_to_sql(sys_id, user_qry, sql, max_retries=5):
     confidence = 0.0
     intent_json = None
     tables_json = None
-    threshold = 0.7
+    threshold = 0.75
     for attempt in range(1, max_retries + 1):
         if (attempt == 1 or confidence < 0.2):
             # Low confidence is most likely due to missing table matches.
@@ -196,9 +273,10 @@ def text_to_sql(sys_id, user_qry, max_retries=5):
             if (attempt > 1):
                 threshold -= 0.05
             qry_intent = analyze_query(user_qry)
+            print("analyzed query: ", qry_intent)
             intent_json = json.loads(qry_intent)
-            print("analyzed query: ", intent_json)
-            search_text = serialize_value(intent_json["semantic"])
+
+            search_text = serialize_value(intent_json)
             tables_json = find_matched_tables(sys_id, search_text, threshold)
             
             if tables_json is None:
@@ -216,8 +294,28 @@ def text_to_sql(sys_id, user_qry, max_retries=5):
         sql_json = json.loads(response)
         logger.info(sql_json)
         confidence = sql_json["confidence"]
-        # sql = sql_json["sql"]
-        if confidence > 0.7:
+        sql = sql_json["sql"]
+        if confidence >= 0.9:
             return sql_json
         
     return None, None
+
+
+def robust_text_to_sql(ds, qry):
+    cursor = ds.get_cursor()
+    sql = None
+    for attempt in range(1, 3):  # 1st and 2nd attempt only
+        sql_json = text_to_sql(ds.sys_id(), qry, sql)
+        logger.info(f'sql: {sql_json}')
+
+        db = sql_json["used_tables"][0]["db"]
+        sql = sql_json["sql"]
+        ds.execute(cursor, f"USE `{db}`")       # ignore return
+        res = ds.execute(cursor, sql)
+        if res and len(res) > 0:
+            logger.info(f"Query succeeded on attempt {attempt}")
+            break  # Success → exit loop early
+    
+    ds.close_cursor(cursor)
+    
+    return res, sql

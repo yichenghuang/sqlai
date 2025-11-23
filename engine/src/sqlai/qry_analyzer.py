@@ -4,7 +4,7 @@ import sys
 from sqlai.llm_service import llm_chat
 from sqlai.utils.str_utils import serialize_value
 
-analyze_table_qry = """You are a data analyst assistant. Your task is to analyze 
+query_analyzer_sys_prompt = """You are a data analyst assistant. Your task is to analyze 
 a natural language question and extract its structured intention.
 
 ### User Question:
@@ -41,7 +41,7 @@ Return JSON with these fields in English:
 }}
 """
 
-query_analyzer_sys_prompt = """
+query_analyzer_sys_prompt_v0 = """
 You are a Text-to-SQL intent extraction assistant. Your job is to convert 
 user question into a two-layer structured representation:
 
@@ -77,9 +77,17 @@ This layer must **not** contain specific values or filter logic.
 - **attributes**: Categorical fields/dimensions (e.g., "gender", "product category"). 
   Include inferred attributes.
 - **concepts**: Core business entities or domains (e.g., "Order", "Product", "Customer").
-- **search_text**: A concise natural-language summary for vector retrieval. 
-  MUST combine concepts, metrics, and attributes. 
-  MUST NOT copy the user query or contain filter/aggregate words.
+- **search_text**: A concise, table-purpose-focused description for vector 
+    search. Must include:
+    - **Table purpose** (e.g., "orders", "demographics"). 
+    - **Broad column descriptions** using **attribute names**, not values (e.g., 'gender', 'location', 'date').
+    - **Base metric fields** (e.g., 'salary', 'employee count') — avoid aggregates like 'total', 'average'.   
+    - **Inferred attributes**: Map common values to attributes:
+        - "female", "male" → include **gender**
+        - "adult", "child" → include **age group**
+        - "urban", "rural" → include **area type**
+        - percentages/ratios → may imply **population**, **household**
+
 
 #### 2. LOGIC LAYER (For SQL Generation)
 This layer preserves all analytical and conditional details.

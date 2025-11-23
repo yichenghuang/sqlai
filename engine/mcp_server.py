@@ -6,7 +6,7 @@ from typing import List, Generator
 from fastmcp import FastMCP
 from sqlai.utils import json_formatter
 from sqlai.core.datasource.datasource_manager import DataSourceManager
-from sqlai.text_to_sql import text_to_sql
+from sqlai.text_to_sql import robust_text_to_sql
 from sqlai.core.job_tracker import JobTracker
 from sqlai.scan_datasource import start_scan_datasource
 
@@ -51,15 +51,23 @@ def query(data_src_id:str, qry: str) -> dict:
         Example: [{"col1": value1, "col2": value2}, ...]
     """
     ds = ds_manager.get_datasource(data_src_id)
-    sql_json = text_to_sql(ds.sys_id(), qry)
-    logger.info(f'sql: {sql_json}')
-    cursor = ds.get_cursor()
-    db = sql_json["used_tables"][0]["db"]
-    sql = sql_json["sql"]
-    ds.execute(cursor, f"USE `{db}`")       # ignore return
-    res = ds.execute(cursor, sql)
-    ds.close_cursor(cursor)
-    return {'sql': sql, 'data': res}
+    # cursor = ds.get_cursor()
+    # sql = None
+    # for attempt in range(1, 3):  # 1st and 2nd attempt only
+    #     sql_json = text_to_sql(ds.sys_id(), qry, sql)
+    #     logger.info(f'sql: {sql_json}')
+
+    #     db = sql_json["used_tables"][0]["db"]
+    #     sql = sql_json["sql"]
+    #     ds.execute(cursor, f"USE `{db}`")       # ignore return
+    #     res = ds.execute(cursor, sql)
+    #     if res and len(res) > 0:
+    #         logger.info(f"Query succeeded on attempt {attempt}")
+    #         break  # Success → exit loop early
+    
+    # ds.close_cursor(cursor)
+    res, sql = robust_text_to_sql(ds, qry)
+    return {'data': res, 'sql': sql}
 
 
 @mcp.tool()

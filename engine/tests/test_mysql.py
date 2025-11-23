@@ -122,7 +122,7 @@ def test_scan_mysql_to_json(mysql: MySQLDataSource, cursor):
     for db in dbs:
         tbls = mysql.get_tables(cursor, db)
 
-        tbls = tbls[:1]
+        # tbls = tbls[:2]
         for tbl in tbls:
             table_annot_json = scan_table(mysql, cursor, db, tbl)
             print(table_annot_json)
@@ -154,6 +154,7 @@ if __name__ == '__main__':
     mysql = MySQLDataSource(conn_params)
     mysql.connect()
     cursor = mysql.get_cursor()
-    test_scan_mysql(mysql, cursor)
+    # test_scan_mysql(mysql, cursor)
+    test_scan_mysql_to_json(mysql, cursor)
     # test_ins_milvus(mysql, cursor)
     mysql.close_cursor(cursor)
