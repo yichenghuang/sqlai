@@ -79,9 +79,10 @@ def scan_table(data_src: DataSource, cursor, db: str, tbl: str):
     tbl_annot_json, col_annot_json = tbl_annotor.annotate_table(tbl_data, schema, comment)
     # table_annot_json = json.loads(tbl_annot)
  
-    tbl_meta = {"db": db, "table": tbl, "comment": comment,
-                "schema": col_annot_json}
-    tbl_annot_json["metadata"] = tbl_meta
+    tbl_annot_json.update({"db": db, "table": tbl, "comment": comment,
+                "schema": col_annot_json})
+
+    print(tbl_annot_json)
 
     return tbl_annot_json
 
@@ -135,13 +136,15 @@ def scan_datasource(data_src: DataSource, complete_time: datetime.datetime):
         for tbl in tables:
             logger.info(tbl)
             tbl_scan = scan_table(data_src, cursor, db, tbl)
-            table_annotation = create_table_embedding_input(tbl_scan['table_annotation'],
-                tbl_scan['metadata']['schema'])
-            print(table_annotation)
+            # table_annotation = create_table_embedding_input(tbl_scan['table_annotation'],
+            #     tbl_scan['metadata']['schema'])
+            print(tbl_scan)
+            table_annotation_str = _serialize_value(tbl_scan)
+
             res = tbl_vdb.insert_tables(sys_id,
-                                        table_annotation, 
-                                        tbl_scan['metadata']['table'],  
-                                        tbl_scan['metadata'])
+                                        table_annotation_str, 
+                                        tbl_scan['table'],
+                                        tbl_scan)
             processed_tables += 1
             logger.info(f"db: {db} tble: {tbl} scanned")
 

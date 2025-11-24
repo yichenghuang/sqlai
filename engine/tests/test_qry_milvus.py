@@ -12,9 +12,9 @@ def getQueryTables(qry):
     return response
 
 
-matches = tbl_vdb.search_tables('_ef992a97be0311f0a4fa2eb586cb076e', query='Accounts table containing region and loan eligibility columns?')
+matches = tbl_vdb.search_tables('_ef992a97be0311f0a4fa2eb586cb076e', query='How many accounts who have region in Prague are eligible for loans?')
 print(len(matches))
 for item in matches:
-    metadata = item['metadata']
+    table = item['table']
     score = item['score']
-    print(f"Metadata: {metadata}, Score: {score}")
+    print(f"Metadata: {table}, Score: {score}")

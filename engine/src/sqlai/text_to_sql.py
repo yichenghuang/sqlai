@@ -62,7 +62,7 @@ Rules:
 - Prioritize each column’s 'col_comment' for semantic cues (e.g., year, data source, context).
 - When columns are similar, identify the explicit noun in the user's query that 
   defines the filter. 
-  * Choose the column whose col_comment (or column name if no comment) contains 
+  * Choose the column whose `col_comment` (or column name if no comment) contains 
     the exact noun/phrase or its closest direct synonym.
   * Never select a column just because it contains a related but broader/looser word.
   * Only if no exact intent match exists, choose column based on the 
@@ -236,11 +236,11 @@ You will be given:
 
 """
 
-def find_matched_tables(sys_id, search_text, threshold):
+def find_matched_tables(matched_tbls, threshold):
     # qry_json = parse_json(intent_json)
     # search_text = qry_json["search_text"]
 
-    matched_tbls = tbl_vdb.search_tables(sys_id, search_text)
+    # matched_tbls = tbl_vdb.search_tables(sys_id, search_text)
  
     # Filter dictionaries with score > 0.77, an empiric value!
     filtered_tbls = [item for item in matched_tbls if item["score"] > threshold]
@@ -255,33 +255,49 @@ def find_matched_tables(sys_id, search_text, threshold):
         return None
 
     logger.info("text2sql", extra={"queried tables": 
-      [{"table": item["metadata"]["table"], "score": item["score"]} for item in filtered_tbls]})
+      [{"table": item["table"], "score": item["score"]} for item in filtered_tbls]})
 
-    tables_json = [tbl["metadata"] for tbl in filtered_tbls]
-    return tables_json
+    # tables_json = [tbl["metadata"] for tbl in filtered_tbls]
+    filtered_tbl_list = [
+      {
+        'db': d['db'],
+        'tbl': d['table'],
+        'comment': d.get('comment', ''),
+        'schema': d['schema']
+      }
+      for d in filtered_tbls
+    ]
+    return filtered_tbl_list
 
 
-def text_to_sql(sys_id, user_qry, sql, max_retries=5):
+def text_to_sql(sys_id, user_qry, sql, sql_error, max_retries=5):
     confidence = 0.0
     intent_json = None
     tables_json = None
-    threshold = 0.75
+    threshold = 0.70
+    threshold_delta = 0.1
+    matched_tbls = None
     for attempt in range(1, max_retries + 1):
         if (attempt == 1 or confidence < 0.2):
             # Low confidence is most likely due to missing table matches.
             # Re-run table matching if necessary.
-            if (attempt > 1):
-                threshold -= 0.05
+            if (attempt > 1 or sql is not None):
+                threshold -= threshold_delta
+                threshold_delta *= 0.7
             qry_intent = analyze_query(user_qry)
             print("analyzed query: ", qry_intent)
             intent_json = json.loads(qry_intent)
 
-            search_text = serialize_value(intent_json)
-            tables_json = find_matched_tables(sys_id, search_text, threshold)
+            # search_text = serialize_value(intent_json)
+            search_text = intent_json["search_text"]
+            matched_tbls = tbl_vdb.search_tables(sys_id, search_text)
+
+            tables_json = find_matched_tables(matched_tbls, threshold)
             
             if tables_json is None:
                 continue
-            
+
+        if sql is None:    
             qry = text2sql_user_prompt.format(user_query = user_qry, 
                 intent_json = intent_json, tables_json=tables_json)
             response = llm_chat(qry, text2sql_sys_prompt)
@@ -301,21 +317,51 @@ def text_to_sql(sys_id, user_qry, sql, max_retries=5):
     return None, None
 
 
+def is_valid_result(result: list) -> bool:
+    # No rows at all
+    if not result:
+        return True
+    # More than 1 row → probably real data
+    if len(result) > 1:
+        return True
+
+    row = result[0]
+    # If row is empty dict
+    if not row:
+        return True
+    # Check every value in the row
+    for value in row.values():
+        # Normalize to string for safe comparison
+        print(value)
+        val_str = str(value).strip().upper()
+        if val_str not in {'0', 'NULL', 'NONE', ''} and value is not None:
+            return True  # At least one real value → good result
+
+    return False
+
+
 def robust_text_to_sql(ds, qry):
     cursor = ds.get_cursor()
     sql = None
-    for attempt in range(1, 3):  # 1st and 2nd attempt only
-        sql_json = text_to_sql(ds.sys_id(), qry, sql)
+    sql_error = None
+    for attempt in range(1, 4):  # 1st and 2nd attempt only
+        sql_json = text_to_sql(ds.sys_id(), qry, sql, sql_error)
         logger.info(f'sql: {sql_json}')
 
         db = sql_json["used_tables"][0]["db"]
         sql = sql_json["sql"]
-        ds.execute(cursor, f"USE `{db}`")       # ignore return
-        res = ds.execute(cursor, sql)
-        if res and len(res) > 0:
-            logger.info(f"Query succeeded on attempt {attempt}")
-            break  # Success → exit loop early
-    
+        try:
+            ds.execute(cursor, f"USE `{db}`")       # ignore return
+
+            res = ds.execute(cursor, sql)
+            print(len(res))
+            if is_valid_result(res):
+              print(f"Number of tries: {attempt}")
+              break  # Success → exit loop early
+        except Exception as e:
+            sql_error = str(e)
+            continue
+
     ds.close_cursor(cursor)
     
     return res, sql

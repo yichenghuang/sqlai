@@ -154,7 +154,7 @@ Write a concise, semantically rich table annotation (50–100 words) to enable s
 
 Instructions:
 
-* Return your answer as a JSON mapping of table_annotation.
+* Return your answer as a JSON mapping of 'table_annotation'.
 * Do not list all column names or types explicitly.
 * Summarize the structure and semantics naturally.
 * Do not mention “JSON” or the schema format.
@@ -338,8 +338,6 @@ def annotate_table(data, schema = None, tbl_comment = None):
             annot['type']        = col_type
             annot['col_comment'] = col_comment
 
-    print(col_annot_json)
-
     col_annot = json.dumps(col_annot_json)
 
     prompt = table_annot_user_prompt.format(col_annot = col_annot, 
@@ -347,8 +345,8 @@ def annotate_table(data, schema = None, tbl_comment = None):
     tbl_annot = llm_chat(prompt, table_annot_sys_prompt)
 
     tbl_annot_json = json.loads(tbl_annot)
-    tbl_annot_json = {"table_annotation": tbl_annot_json}
 
-    print(tbl_annot_json)
+    # print(col_annot_json)
+    # print(tbl_annot_json)
 
     return tbl_annot_json, col_annot_json

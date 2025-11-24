@@ -82,6 +82,7 @@ class TableMilvus(metaclass=SingletonMeta):
             tbl_name (str): table name
             metadata: metadata
         """
+
         # Generate embeddings
         embeddings = cls.model.encode([tbl_annot], show_progress_bar=False)
         name_embeddings = cls.model.encode([tbl_name], show_progress_bar=False)
@@ -162,15 +163,31 @@ class TableMilvus(metaclass=SingletonMeta):
             output_fields=["name_embedding", "metadata"],
         )
     
-        score=[]
-        for hit in results[0]:
-            cosine_score = sen_trans_util.cos_sim(hit["entity"]["name_embedding"], query_embedding)[0][0]
-            similarity_score = float((cosine_score + 1) / 2)
-            score.append(max(hit["distance"], similarity_score))
+        matches=[]
+        # score=[]
+        # for hit in results[0]:
+        #     cosine_score = sen_trans_util.cos_sim(hit["entity"]["name_embedding"], query_embedding)[0][0]
+        #     similarity_score = float((cosine_score + 1) / 2)
+        #     score.append(max(hit["distance"], similarity_score))
+        #     # score.append(hit["distance"])
 
-        matches = [
-            {"metadata": hit["entity"]["metadata"], "score": score}
-            for hit,score in zip(results[0], score)
-        ]
+        # for hit, score in zip(results[0], score): 
+        #     matched_tbl = hit["entity"]["metadata"]
+        #     matched_tbl["score"] = score
+        #     matches.append(matched_tbl)
+
+        for hit in results[0]: 
+            matched_tbl = hit["entity"]["metadata"]
+            matched_tbl["score"] = hit["distance"]
+            matches.append(matched_tbl)
+
+
+        # matches = [
+        #     # {hit["entity"]["metadata"], "score": score}
+        #     {"metadata": hit["entity"]["metadata"], "score": score}
+        #     for hit,score in zip(results[0], score)
+        # ]
+        # for hit in matches:
+        #     print(hit['table'], hit['score'])
 
         return matches

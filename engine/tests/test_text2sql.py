@@ -2,7 +2,7 @@ import json
 import sys
 import os
 import logging
-from sqlai.text_to_sql import text_to_sql
+from sqlai.text_to_sql import text_to_sql, robust_text_to_sql
 from sqlai.utils import json_formatter
 from sqlai.core.datasource.mysql import MySQLDataSource
 
@@ -29,10 +29,13 @@ if __name__ == '__main__':
     mysql_source = MySQLDataSource(conn_params)  # Env vars resolved here
     mysql_source.connect()
     mysql_sys_id = mysql_source.sys_id()
-    cursor = mysql_source.get_cursor()
-
-    sql_json = text_to_sql(mysql_sys_id, query)
-    print(sql_json)
+    # cursor = mysql_source.get_cursor()
+    # res = mysql_source.execute(cursor, "use financial;")
+    # res = mysql_source.execute(cursor, "select k_symbol from trans limit 1;")
+    # print(res)
+    res, sql = robust_text_to_sql(mysql_source, query)
+    print(res)
+    print(sql)
 
     # sql_json = text_to_sql(mysql_sys_id, "Show me the total revenue by Product categories")
     # sql_json = text_to_sql(mysql_sys_id, "不同性別的銷售總額")
