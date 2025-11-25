@@ -2,6 +2,7 @@ import os
 
 #_DEFAULT_MODEL = os.getenv("LLM_MODEL", "gpt-4.1")
 _DEFAULT_MODEL = os.getenv("LLM_MODEL", "gemini-2.0-flash")
+# _DEFAULT_MODEL = os.getenv("LLM_MODEL", "claude-opus-4-5")
 
 class ModelConfig:
     """Singleton-like class to manage the global model name."""

@@ -9,6 +9,7 @@ Requirements:
     uv add fastmcp
     uv add openai
     uv add google-generativeai
+    uv add anthropic
     uv add wcwidth
     uv add sentence-transformers
     uv add pymilvus

@@ -71,7 +71,8 @@ Rules:
 - Always include the database name as a prefix when tables come from different databases.
 - When columns are similar, choose based on the comment/description that best matches the user’s intent.
 - If some information is ambiguous or missing, make the best reasonable assumption and lower your confidence accordingly.
-- Return the result strictly as a valid JSON object with the following fields:
+- Your response must be valid JSON only as below. No other text.
+
   {
     "sql": "<the generated SQL query as a string>",
     "used_tables": [{"db": "<database_name>", "table": "<table_name>"}, ...]
@@ -314,7 +315,7 @@ def text_to_sql(sys_id, user_qry, sql, sql_error, max_retries=5):
         if confidence >= 0.9:
             return sql_json
         
-    return None, None
+    return None
 
 
 def is_valid_result(result: list) -> bool:
@@ -344,8 +345,12 @@ def robust_text_to_sql(ds, qry):
     cursor = ds.get_cursor()
     sql = None
     sql_error = None
+    res = None
     for attempt in range(1, 4):  # 1st and 2nd attempt only
         sql_json = text_to_sql(ds.sys_id(), qry, sql, sql_error)
+        if sql_json is None:
+            continue
+        
         logger.info(f'sql: {sql_json}')
 
         db = sql_json["used_tables"][0]["db"]

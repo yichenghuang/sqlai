@@ -1,4 +1,6 @@
 import logging
+import re
+import anthropic
 from openai import OpenAI
 import google.generativeai as genai
 from sqlai.core.config import ModelConfig
@@ -78,6 +80,36 @@ def genai_chat(model, user_prompt, system_prompt=genai_def_sys_prompt):
     except Exception as e:
         logger.error("call gemini", f"An error occurred: {e}")
         return "Failed to get a response from the model."
+
+
+### Anthrpic
+anthropic_def_sys_prompt="You are a data analyst. You only output valid JSON objects and nothing else.",
+
+def anthropic_chat(model, user_prompt, system_prompt=anthropic_def_sys_prompt):
+    """
+    Sends a message to the Anthropic model and returns the text response.
+
+    Args:
+        model: The Anthropic model instance (e.g., claude-sonnet-4-5).
+        msg: The user's message as a string.
+
+    Returns:
+        The model's generated text as a string.
+    """
+    client = anthropic.Anthropic()
+    response = client.messages.create(
+        model = model,
+        max_tokens=2048,
+        system = system_prompt,
+        messages=[
+            {"role": "user", "content": user_prompt}
+        ]
+    )
+    resp_text = remove_code_block(response.content[0].text, 'json')
+    match_text = re.search(r'\{.*\}', resp_text, re.DOTALL)
+    match_text = match_text.group()
+    print(match_text)
+    return match_text
     
 
 def llm_chat(user_prompt, sys_prompt = None):
@@ -87,15 +119,20 @@ def llm_chat(user_prompt, sys_prompt = None):
         match service_model:
             case 'gemini':
                  return genai_chat(model, user_prompt, sys_prompt)
-            # case 'grok':
-            #     print('Calling xAI Grok API...')
             case 'gpt': 
                 return openai_chat(model, user_prompt, sys_prompt)
+            case 'claude':
+                return anthropic_chat(model, user_prompt, sys_prompt)
+            # case 'grok':
+            #     print('Calling xAI Grok API...')
     else:       
         match service_model:
             case 'gemini':
                 return genai_chat(model, user_prompt)
-            # case 'grok':
-            #     print('Calling xAI Grok API...')
+
             case 'gpt':
                 return openai_chat(model, user_prompt)
+            case 'claude':
+                return anthropic_chat(model, user_prompt, sys_prompt)
+            # case 'grok':
+            #     print('Calling xAI Grok API...')
