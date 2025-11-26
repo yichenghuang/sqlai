@@ -11,6 +11,51 @@ logger = logging.getLogger(__name__)
 logger.addHandler(logging.NullHandler())
 
 
+def fix_broken_llm_json(text: str) -> dict:
+    r"""
+    Fixes broken JSON from LLMs (unescaped quotes, \_id, etc.)
+    while leaving correct JSON untouched.
+    """
+
+# 1. Remove ```json wrapper if present
+    if "```" in text:
+        match = re.search(r"```(?:json)?\s*([\s\S]*?)\s*```", text)
+        if match:
+            text = match.group(1)
+        else:
+            # Fallback: extract first { ... } or [ ... ]
+            start = text.find("{")
+            end = text.rfind("}") + 1
+            if start != -1 and end > start:
+                text = text[start:end]
+            else:
+                raise ValueError("No JSON found")
+
+    # ------------------------------------------------------------------
+    # 1. Remove Markdown escapes: \_ → _, \* → *, \< → <, \> → >
+    # ------------------------------------------------------------------
+    text = re.sub(r"\\(_|\*|<|>|`)", r"\1", text)
+
+    ## 3. Fix ONLY strings that contain unescaped double quotes
+    def fix_bad_quotes(match):
+        key_part = match.group(1)      # e.g. "sql": "
+        content  = match.group(2)      # the broken content
+        closing  = match.group(3)      # final "
+
+        # Only fix if there's a naked " inside
+        if '"' in content and '\\"' not in content:
+            content = content.replace("\\", "\\\\").replace('"', '\\"')
+        return key_part + content + closing
+
+    # Apply only to string values that likely have unescaped quotes
+    text = re.sub(r'(:\s*")([^"\\]*(?:\\.[^"\\]*)*)(")', fix_bad_quotes, text)
+
+    # 4. Remove trailing commas before } or ]
+    text = re.sub(r",\s*([}\]])", r"\1", text)
+
+    return text
+
+
 ### OpenAI
 openai_def_sys_prompt="You are a data analyst. Only output valid JSON. Do not include any explanation or repeat the input."
 
@@ -57,9 +102,10 @@ def genai_chat(model, user_prompt, system_prompt=genai_def_sys_prompt):
         )
         response = llm_model.generate_content(user_prompt)
         if response and response.candidates and response.candidates[0].content and response.candidates[0].content.parts:
-            # resp_text = remove_json_code_block(
-            #     response.candidates[0].content.parts[0].text)
-            resp_text = remove_code_block(response.candidates[0].content.parts[0].text, 'json')
+
+            print(response.candidates[0].content.parts[0].text)
+            resp_text = fix_broken_llm_json(response.candidates[0].content.parts[0].text)
+            # resp_text = remove_code_block(response.candidates[0].content.parts[0].text, 'json')
 
             if logger.isEnabledFor(logging.INFO):
                 # hack the gemini usage_metadata since it is a protobuf message,
@@ -108,7 +154,6 @@ def anthropic_chat(model, user_prompt, system_prompt=anthropic_def_sys_prompt):
     resp_text = remove_code_block(response.content[0].text, 'json')
     match_text = re.search(r'\{.*\}', resp_text, re.DOTALL)
     match_text = match_text.group()
-    print(match_text)
     return match_text
     
 

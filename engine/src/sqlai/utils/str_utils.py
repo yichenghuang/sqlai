@@ -30,10 +30,6 @@ def remove_code_block(text: str, marker: str) -> str:
     # If the markers aren't present, return the original text
     return text
 
-def fix_and_parse_llm_json(malformed: str):
-    fixed = malformed.replace(r'\"', '"')
-    fixed = fixed.encode().decode('unicode-escape')
-    return fixed
 
 # def fix_and_parse_llm_json(malformed: str) -> dict:
 #     """
