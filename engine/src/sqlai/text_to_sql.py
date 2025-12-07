@@ -15,49 +15,18 @@ tbl_vdb = TableMilvus()
 
 
 domain_rules = """
-{
+{ 
   "column_mappings": {
     "region": "A3",
   },
   "keyword_mapping_rules": [
-    { "if_user_mentions": ["loans"], 
-      "join": "financial.loan"},
+    { "if_user_mentions": ["loans", "load eligibility"], 
+      "join": "financial.loan",
+      "forbidden_columns_inference": ["financial.loan.status"],},
   ],
 }
 """
 
-# Rules:
-# - Only use the provided tables and columns.
-# - Follow the intent JSON exactly:
-#    - `metrics`: Apply correct aggregation (e.g., COUNT → `COUNT(*)`, average → `AVG(col)`)
-#    - `attributes`: Use in `GROUP BY`, `SELECT`, or joins
-#    - `filters`: Translate into `WHERE` or `HAVING` clauses **with exact logic**
-#    - `time_constraints`: Apply to date/time columns
-# - Use joins only when needed.
-# - Prefer INNER JOINs over subqueries for linking tables.
-# - Use subqueries only if they’re logically required (e.g., aggregation before filtering)
-# - Prefer descriptive fields (e.g., `customer_name` over `customer_id`).
-# - Prioritize each column’s 'col_comment' for semantic cues (e.g., year, data source, context).
-# - When columns are similar, identify the explicit noun in the user's query that 
-#   defines the filter. 
-#   * Choose the column whose `col_comment` (or column name if no comment) contains 
-#     the exact noun/phrase or its closest direct synonym.
-#   * Never select a column just because it contains a related but broader/looser word.
-#   * Only if no exact intent match exists, choose column based on the 
-#     col_comment, description or name that best matches the user’s intent.
-# - Ignore irrelevant tables and columns.
-# - Always include the database name as a prefix when tables come from different databases.
-# - When columns are similar, choose based on the comment/description that best matches the user’s intent.
-# - DOMAIN-SPECIFIC RULES override ambiguous user wording or schema ambiguity.
-#   If there is any conflict between general interpretation and domain-specific rules,
-#   ALWAYS apply the domain-specific rule.
-#   When interpreting user text, resolve column in this order:
-#   (1) Domain-specific rules
-#   (2) col_ocmment
-#   (3) colum name
-#   (4) column description
-
-# - If some information is ambiguous or missing, make the best reasonable assumption and lower your confidence accordingly.
 
 text2sql_sys_prompt = """
 You are an expert SQL query generator. 
@@ -102,18 +71,23 @@ Additional selection constraints:
 - Only if no exact match exists, choose based on best semantic fit across comment/name/description.
 
 ==========================
-  NO BUSINESS-LOGIC INFERENCE RULE
+STRICT NO-INFERENCE POLICY
 ==========================
-This means:
-- Do NOT assume thresholds, classifications, statuses, or business rules.
-- Do NOT infer meanings like "active", "valid", "current", "successful", 
-  "eligible", "completed", "latest", etc., unless the intent JSON provides 
-  explicit filters.
-- Do NOT transform or reinterpret user intent using business knowledge 
-  (e.g., “Prague region” → assume multiple districts unless provided).
-- Only map user phrasing to columns; never inject your own domain assumptions.
+The model must **never invent business logic**.
+You must NOT:
+- assume meanings of status codes or categorical values  
+- assume that any code represents approval, eligibility, activation, etc.  
+- create category groups (e.g., grouping several code values together)  
+- infer hidden business rules, hierarchies, or classification logic  
+- add “reasonable-sounding” filters not explicitly supported by intent, user text, or domain_rules
 
-If the input does not specify a condition, DO NOT invent one.
+The ONLY allowed sources of business-logic are:
+1) The natural-language question  
+2) The intent JSON  
+3) The schema metadata (column name, comment, description)  
+4) The **domain_rules object** (highest priority)  
+
+If a business rule is not explicitly stated in domain_rules or user intent, it must NOT appear in the SQL.
 
 ==========================
   INTENT JSON COMPLIANCE
@@ -198,7 +172,7 @@ Expected output:
     {"db": "salesdb", "table": "customers"},
     {"db": "salesdb", "table": "orders"}
   ]
-  "confidence": 0.95
+  "confidence": 0.99
 }
 
 """
@@ -308,18 +282,19 @@ Review and improve this query to better match the question and schema.
 
 
 text2sql_review_sys_prompt = """
-You are an expert SQL correctness reviewer. Your only job is to critically examine a 
-generated SQL query and determine whether it is 100% correct given:
+You are an expert SQL correctness reviewer. Your only job is to examine if the
+generated SQL query is 100% correct given:
 
-1. The exact database schema (column names, types, descriptions, and column comments)
+1. The exact database schema (column names, types, descriptions, and col_comment)
 2. The original natural-language user question
 3. The LLM-generated query intent
 4. The analysis of SQL correctness (if provided)
 5. The DOMAIN-SPECIFIC RULES (if provided)
 
-Domain-specific rules define mandatory column mappings, keyword→column associations,
-or required filter conditions. These rules override ambiguous natural-language wording.
-If a domain rule contradicts the SQL query, the SQL must be marked incorrect.
+Core principle:
+  All business-level mappings, category groups, or "meanings" must be explicitly 
+  present in domain rules. If domain rules disallows inference,
+  you must not accept any mapping invented by the generator.
 
 -------------------------------------
 MANDATORY VERIFICATION CHECKLIST
@@ -347,17 +322,16 @@ You MUST follow these and explicitly reason about them:
    - All necessary tables are joined and no unnecessary tables are included
    - No missing filters implied by domain rules or by the user’s intent
 
-4. Filter Source Verification (MANDATORY — step-by-step reasoning)
+4. Filter Source Verification (step-by-step reasoning)
    For every filter in the SQL (WHERE, HAVING, JOIN ON filters), you MUST:
      1. Explicitly list each filter found in the SQL.
      2. For each filter, examine its possible origin in this exact order:
-        (a) Does the user question explicitly or implicitly request it?
+        (a) Does the user question explicitly request it?
         (b) Does the intent JSON require it?
         (c) Is it required by domain-specific rules?
         (d) Is it required for the JOIN logic to function?
      3. If a filter does NOT come from (a), (b), (c), or (d),
-        it is an unnecessary or unjustified filter,
-        and the SQL must be marked incorrect.
+        it is an unjustified filter,and mark the SQL incorrect.
      4. A filter that restricts results beyond what the user intended
       makes the SQL incorrect, even if it appears “reasonable.”
 
@@ -484,7 +458,6 @@ def text_to_sql(sys_id, user_qry, sql, sql_error, max_retries=5):
         except json.JSONDecodeError as e:
             continue
 
-        logger.info(sql_json)
         confidence = sql_json["confidence"]
         if sql is not None:
           sql_analysis = sql_json["analysis"]
@@ -497,7 +470,6 @@ def text_to_sql(sys_id, user_qry, sql, sql_error, max_retries=5):
                 intent_json = intent_json, tables_json=matched_used_tables, 
                 confidence=confidence, prev_sql=sql, domain_rules = domain_rules)
             response = llm_chat(qry, text2sql_review_sys_prompt)
-            print(response)   
             try:
                 review_sql_json = json.loads(response)
             except json.JSONDecodeError as e:
@@ -550,7 +522,6 @@ def robust_text_to_sql(ds, qry):
             ds.execute(cursor, f"USE `{db}`")       # ignore return
 
             res = ds.execute(cursor, sql)
-            print(res)
             if is_valid_result(res):
               print(f"Number of tries: {attempt}")
               break  # Success → exit loop early

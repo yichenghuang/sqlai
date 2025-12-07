@@ -76,7 +76,7 @@ def openai_chat(model, user_prompt, system_prompt=openai_def_sys_prompt):
         messages = [
             { "role": "system", "content": system_prompt },
             { "role": "user", "content": user_prompt }
-        ]
+        ],
     )
     return response.choices[0].message.content
 
@@ -102,8 +102,6 @@ def genai_chat(model, user_prompt, system_prompt=genai_def_sys_prompt):
         )
         response = llm_model.generate_content(user_prompt)
         if response and response.candidates and response.candidates[0].content and response.candidates[0].content.parts:
-
-            print(response.candidates[0].content.parts[0].text)
             resp_text = fix_broken_llm_json(response.candidates[0].content.parts[0].text)
             # resp_text = remove_code_block(response.candidates[0].content.parts[0].text, 'json')
 
