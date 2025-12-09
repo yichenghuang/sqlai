@@ -71,6 +71,23 @@ Additional selection constraints:
 - Only if no exact match exists, choose based on best semantic fit across comment/name/description.
 
 ==========================
+Comparative-Intent Rules
+==========================
+- When the user question asks which value/period/category is "higher", "lower", "better", 
+  "greater", "smaller", "largest", "smallest", or uses phrasing such as 
+  "which one has …", "which year has …", "which region has …":
+    * The SQL **must not** merely return raw values for each category.
+    * The SQL **must convert the question into a direct comparison**, producing one
+      of the following:
+        - A `CASE WHEN` expression that outputs the winning category
+        - An `ORDER BY … LIMIT 1` (if appropriate)
+        - A computed comparison column indicating which value is greater
+    * The output SQL must answer the *which one* question, not just compute metrics.
+
+- If two values must be compared (e.g., “A vs B”), ensure the SQL expresses a 
+  comparison, not merely returns both columns.
+
+==========================
 STRICT NO-INFERENCE POLICY
 ==========================
 The model must **never invent business logic**.
